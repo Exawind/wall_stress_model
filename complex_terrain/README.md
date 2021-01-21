@@ -6,17 +6,12 @@ and flow over a three-dimensional hill
 
 ## Basic settings
 
-| Parameter       | Value                      |
-|-----------------|----------------------------|
-| Reynolds number | 10600 based on hill height |
-| Hill height     | 1 m                        |
-| Fluid density   | 1 kg/m^3                   |
-| Fluid velocity  | 1 m/s                      |
-| Fluid viscosity | 10600                      |
-|                 |                            |
+| Parameter       | Value                        |
+|-----------------|------------------------------|
+| Reynolds number | 10,500 based on ridge height |
+| Hill height     | 0.04 m                       |
+| Fluid density   | 1 kg/m^3                     |
+| Fluid velocity  | 0.3 m/s                      |
 
 **Mesh generation**  
-Meshes for this case are generated using
-[Pointwise](https://www.pointwise.com/) glyph scripts.
-
-**Nalu-Wind**  
+Meshes for this case are generated using wind_utils abl_mesh and pystk based python script
