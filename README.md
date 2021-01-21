@@ -1,4 +1,4 @@
-# ExaWind IDDES turbulence model development
+# ExaWind no-slip wall-stress model development & validation
 
 Repositry for storing Exawind simulations with Hybrid RANS/LES models,
 including:
