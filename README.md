@@ -3,5 +3,5 @@
 Repositry for storing Exawind simulations with the new no-slip wall-strress model,
 include:
 - [Complex Terrain](complex_terrain)  
-- [Moving waves](movingWaves)  
+- [Moving waves](moving_waves)  
 
