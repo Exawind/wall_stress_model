@@ -15,3 +15,7 @@ and flow over a three-dimensional hill
 
 **Mesh generation**  
 Meshes for this case are generated using wind_utils abl_mesh and pystk based python script
+
+**Flow setup**
+The inflow conditions are generated with a precursor simulation
+
