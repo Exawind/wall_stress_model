@@ -13,8 +13,8 @@ nalu_abl_mesh:
   fluid_part_name: fluid_part
 
   vertices:
-  - [-0.325,  0.0, 0.0]
-  - [0.975,  0.24, 0.24]
+  - [-0.32,  -0.36, 0.0]
+  - [0.96,    0.36, 0.36]
 
   mesh_dimensions: [125, 24, 24]
 

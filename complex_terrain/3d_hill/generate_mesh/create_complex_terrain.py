@@ -111,8 +111,8 @@ a=3.; # Mesh damping factor
 ## Interating and acting over entire buckets
 for bkt in mesh.iter_buckets(sel, StkRank.NODE_RANK):
     xyz = coords.bkt_view(bkt)
-    mask=np.heaviside(b-np.abs(xyz[:,0]),1.0)
-    xyz[:, -1] = xyz[:,-1]+mask*h*np.cos(np.pi*xyz[:,0]/(2*b))*(1-xyz[:,-1]/Lz)**a
+    mask=np.heaviside(b-np.sqrt(xyz[:,0]**2.0+xyz[:,1]**2.0),1.0)
+    xyz[:, -1] = xyz[:,-1]+mask*h*np.cos(np.pi*np.sqrt(xyz[:,0]**2.0+xyz[:,1]**2.0)/(2*b))*(1-xyz[:,-1]/Lz)**a
 
 
 # Iterating over entities
@@ -127,7 +127,7 @@ for node in mesh.iter_entities(sel, StkRank.NODE_RANK):
 
 print("Num. nodes = ", count, "; minz = ", minz, "; maxz = ", maxz)
 
-filename_out="2d_ridge.exo"
+filename_out="3d_hill.exo"
 purpose=stk.DatabasePurpose.WRITE_RESULTS
 stkio = mesh.stkio
 fh = stkio.create_output_mesh(filename_out, purpose=purpose)
