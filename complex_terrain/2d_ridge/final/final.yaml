@@ -1,0 +1,436 @@
+# -*- mode: yaml -*-
+#
+# Nalu Preprocessing utility
+#
+# Generate a temperature profile with capping inversion for use with ablNeutralEdge case
+#
+
+nalu_abl_mesh:
+  output_db: mesh.exo
+
+  spec_type: bounding_box
+
+  fluid_part_name: fluid_part
+
+  vertices:
+  - [-0.325,  0.0, 0.0]
+  - [0.975,  0.24, 0.24]
+
+  mesh_dimensions: [192, 64, 64]
+
+  xmin_boundary_name: west
+
+  xmax_boundary_name: east
+
+  ymin_boundary_name: south
+
+  ymax_boundary_name: north
+
+  zmin_boundary_name: lower
+
+  zmax_boundary_name: upper
+
+  x_spacing:
+    spacing_type: constant_spacing
+  
+  y_spacing:
+    spacing_type: constant_spacing
+
+  z_spacing:
+    spacing_type: geometric_stretching
+    stretching_factor: 1.03
+    bidirectional: false 
+
+
+# Mandatory section for Nalu preprocessing
+nalu_preprocess:
+  # Name of the input exodus database
+  input_db: 2d_ridge.exo
+  # Name of the output exodus database
+  output_db: 2d_ridge_init.exo
+
+  # Nalu preprocessor expects a list of tasks to be performed on the mesh and
+  # field data structures
+  tasks:
+  - init_abl_fields
+
+  init_abl_fields:
+
+    # Fluid part is the interior mesh block(s) in the mesh. The default block is
+    # `fluid` if the mesh was generated using `abl_mesh` utility.
+    #
+    # Use `ncdump -v eb_names <exodus_file>` to determine the mesh blocks
+    #
+    fluid_parts: [fluid_part]
+
+    temperature:
+      heights: [0, 0.24]
+      values: [300.0]
+
+      # Optional section to add random perturbations to temperature field
+#      perturbations:
+#        amplitude: 0.8 # in Kelvin
+#        cutoff_height: 600.0 # Perturbations below capping inversion
+#        skip_periodic_parts: [east, west, north, south]
+
+    velocity:
+      heights:
+      - 0
+      - 0.35
+      values:
+      - - .5
+        - 0.0
+        - 0.0
+      - - .5
+        - 0.0
+        - 0.0
+      perturbations:
+        reference_height: .1   # Reference height for damping
+        amplitude: [0, 0]    # Perturbation amplitudes in Ux and Uy
+        periods: [2.0, 2.0]      # Num. periods in x and y directions
+
+  create_bdy_io_mesh:
+    output_db: boundary_data.exo
+    boundary_parts: [west]   
+
+
+Simulations:
+- name: sim1
+  time_integrator: ti_1
+  optimizer: opt1
+
+# Specify the linear system solvers.
+linear_solvers:
+
+  # solver for scalar equations
+- name: solve_scalar
+  type: tpetra
+  method: gmres
+  preconditioner: sgs
+  tolerance: 1e-6
+  max_iterations: 75
+  kspace: 75
+  output_level: 0
+
+  # solver for the pressure Poisson equation
+- name: solve_cont
+  type: tpetra
+  method: gmres
+  preconditioner: muelu
+  tolerance: 1e-6
+  max_iterations: 75
+  kspace: 75
+  output_level: 0
+  recompute_preconditioner: no
+  muelu_xml_file_name: ./milestone.xml
+
+
+# Specify the differnt physics realms.  Here, we just have one for the fluid.
+realms:
+
+  # The fluid realm that uses the 5 km x 5 km x 1 km atmospheric LES mesh.
+- name: fluidRealm
+  mesh: 2d_ridge_init.exo
+  use_edges: yes
+  automatic_decomposition_type: rcb
+
+    # This defines the equations to be solved: momentum, pressure, static enthalpy,
+    # and subgrid-scale turbulent kinetic energy.  The equation system will be iterated
+    # a maximum of 4 outer iterations.
+  equation_systems:
+    name: theEqSys
+    max_iterations: 2
+
+      # This defines which solver to use for each equation set.  See the
+      # "linear_solvers" block.  All use the scalar solver, except pressure.
+    solver_system_specification:
+      velocity: solve_scalar
+      pressure: solve_cont
+      enthalpy: solve_scalar
+      turbulent_ke: solve_scalar
+
+      # This defines the equation systems, maximum number of inner iterations,
+      # and scaled nonlinear residual tolerance.
+    systems:
+
+    - LowMachEOM:
+        name: myLowMach
+        max_iterations: 1
+        convergence_tolerance: 1.0e-5
+    
+    - Enthalpy:
+        name: myEnth
+        max_iterations: 1
+        convergence_tolerance: 1.0e-5
+
+    - TurbKineticEnergy:
+        name: myTke
+        max_iterations: 1
+        convergence_tolerance: 1.0e-5
+
+    # Specify the properties of the fluid, in this case air.
+  material_properties:
+
+    target_name: [fluid_part]
+
+    constant_specification:
+      universal_gas_constant: 8314.4621
+      reference_pressure: 101325.0
+
+    reference_quantities:
+    - species_name: Air
+      mw: 29.0
+      mass_fraction: 1.0
+
+    specifications:
+
+        # Density here was computed such that P_ref = rho_ref*(R/mw)*300K
+    - name: density
+      type: constant
+      value: 1.178037722969475
+
+    - name: viscosity
+      type: constant
+      value: 1.2E-5
+
+    - name: specific_heat
+      type: constant
+      value: 1000.0
+
+    # The initial conditions are that pressure is uniformly 0 Pa and velocity
+    # is 8 m/s from 245 degrees (southwest).  Initial temperature is not
+    # specified here because later it is specified as read in from file.
+    # Also, perturbations are applied near the surface to initiate turbulence.
+  initial_conditions:
+  - constant: ic_1
+    target_name: [fluid_part]
+        # These are dummy variables to be overwritten by nalu_wind_utils
+    value:
+      pressure: 0.0
+      velocity: [1.0,0.0, 0.0]
+
+  boundary_conditions:
+
+  - periodic_boundary_condition: bc_north_south
+    target_name: [north, south]
+    periodic_user_data:
+      search_tolerance: 0.0001
+
+  - abltop_boundary_condition: bc_upper
+    target_name: upper
+    abltop_user_data:
+      potential_flow_bc: false
+      normal_temperature_gradient: 0.0
+
+  - open_boundary_condition: bc_open_east
+    target_name: east
+    open_user_data:
+      velocity:
+      - 1.0
+      - 0.0
+      - 0.0
+      temperature: 300.0
+      pressure: 0.0
+
+  - inflow_boundary_condition: bc_inflow_west
+    target_name: west
+    inflow_user_data:
+      velocity:
+      - 1.0
+      - 0.0
+      - 0.0
+      temperature: 300.0
+      external_data: yes
+
+  - wall_boundary_condition: bc_lower
+    target_name: lower
+    wall_user_data:
+      velocity: [0.0,0.0,0.0]
+      abl_wall_function:
+        surface_heating_table:
+          - [     0.0, 0.00, 300.0, 1.0]
+          - [999999.9, 0.00, 300.0, 1.0]
+        reference_temperature: 300.0
+        roughness_height: 0.000004
+        kappa: 0.4
+        beta_m: 5.0
+        beta_h: 5.0
+        gamma_m: 16.0
+        gamma_h: 16.0
+        gravity_vector_component: 3
+        monin_obukhov_averaging_type: planar
+        fluctuation_model: Moeng
+        fluctuating_temperature_ref: surface
+
+  solution_options:
+    name: myOptions
+    turbulence_model: ksgs
+    interp_rhou_together_for_mdot: yes
+
+      # Pressure is not fixed anywhere on the boundaries, so set it at
+      # the node closest to the specified location.
+    fix_pressure_at_node:
+      value: 0.0
+      node_lookup_type: spatial_location
+      location: [-0.1, 0.13, .01]
+      search_target_part: [fluid_part]
+      search_method: stk_kdtree
+
+    options:
+
+        # Model constants for the 1-eq k SGS model.
+    - turbulence_model_constants:
+        kappa: 0.4
+        cEps: 0.93
+        cmuEps: 0.0673
+
+    - laminar_prandtl:
+        enthalpy: 0.7
+
+        # Turbulent Prandtl number is 1/3 following Moeng (1984).
+    - turbulent_prandtl:
+        enthalpy: 0.3333
+
+        # SGS viscosity is divided by Schmidt number in the k SGS diffusion
+        # term.  In Moeng (1984), SGS viscosity is multiplied by 2, hence
+        # we divide by 1/2
+    - turbulent_schmidt:
+        turbulent_ke: 0.5
+
+        # The momentum source terms are a Boussinesq bouyancy term,
+        # Coriolis from Earth's rotation, and a source term to drive
+        # the planar-averaged wind at a certain height to a certain
+        # speed.
+    - source_terms:
+        momentum: 
+          - body_force
+        turbulent_ke:
+          - rodi
+    - source_term_parameters:
+        momentum: [0.00000001,0.0,0.0]
+
+    - user_constants:
+        reference_density: 1.
+        reference_temperature: 300.0
+        gravity: [0.0, 0.0, -9.81]
+        thermal_expansion_coefficient: 3.33333333e-3
+        east_vector: [1.0, 0.0, 0.0]
+        north_vector: [0.0, 1.0, 0.0]
+        latitude: 41.3
+        earth_angular_velocity: 7.2921159e-5
+
+    - limiter:
+        pressure: no
+        velocity: no
+        enthalpy: yes
+
+    - peclet_function_form:
+        velocity: tanh
+        enthalpy: tanh
+        turbulent_ke: tanh
+
+    - peclet_function_tanh_transition:
+        velocity: 50000.0
+        enthalpy: 2.0
+        turbulent_ke: 2.0
+
+    - peclet_function_tanh_width:
+        velocity: 200.0
+        enthalpy: 1.0
+        turbulent_ke: 1.0
+
+    - input_variables_from_file:
+        velocity: velocity
+        temperature: temperature
+
+  output:
+    output_data_base_name: output/2d_ridge.exo
+    output_frequency: 100
+    output_node_set: no
+    output_variables:
+    - velocity
+    - pressure
+    - enthalpy
+    - temperature
+    - turbulent_ke
+  
+  boundary_layer_statistics:
+    target_name: [fluid_part]
+    stats_output_file: abl_statistics.nc
+    compute_temperature_statistics: yes
+    output_frequency: 10
+    time_hist_output_frequency: 1
+
+  
+  restart:
+    restart_data_base_name: rst/2dridge.rst
+    restart_frequency: 1000
+
+- name: ioRealm
+  mesh: ../input_output/boundaryData/boundary_data.exo
+  type: external_field_provider
+
+  field_registration:
+    specifications:
+
+    - field_name: velocity_bc
+      target_name: &id001 [west]
+      field_size: 3
+      field_type: node_rank
+
+    - field_name: cont_velocity_bc
+      target_name: *id001
+      field_size: 3
+      field_type: node_rank
+
+    - field_name: temperature_bc
+      target_name: *id001
+      field_size: 1
+      field_type: node_rank
+
+    - field_name: turbulent_ke_bc
+      target_name: *id001
+      field_size: 1
+      field_type: node_rank
+
+  solution_options:
+    name: myOptions
+    input_variables_interpolate_in_time: yes 
+    input_variables_from_file_restoration_time: 20.
+
+    options:
+    - input_variables_from_file:
+        velocity_bc: velocity_bc
+        cont_velocity_bc: cont_velocity_bc
+        temperature_bc: temperature_bc
+        turbulent_ke_bc: turbulent_ke_bc
+
+transfers:
+- name: west
+  type: geometric
+  realm_pair: [ioRealm, fluidRealm]
+  mesh_part_pair: [west, west]
+  objective: external_data
+  search_tolerance: 5.0e-4
+  transfer_variables:
+  - [velocity_bc, velocity]
+  - [velocity_bc, velocity_bc]
+  - [temperature_bc, temperature]
+  - [temperature_bc, temperature_bc]
+  - [turbulent_ke_bc, tke_bc]
+  - [turbulent_ke_bc, turbulent_ke]
+
+
+Time_Integrators:
+- StandardTimeIntegrator:
+    name: ti_1
+    start_time: 0.0
+    termination_step_count: 20000
+    time_step: 0.005
+    time_stepping_type: fixed
+    time_step_count: 0
+    second_order_accuracy: yes
+
+    realms:
+    - fluidRealm
+    - ioRealm
