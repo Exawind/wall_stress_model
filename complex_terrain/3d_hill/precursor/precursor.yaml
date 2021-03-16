@@ -5,12 +5,12 @@
 # Generate a temperature profile with capping inversion for use with ablNeutralEdge case
 # delta = {delta = 0.36} m 
 # ustar = {ustar = 0.212} m/s
-# nu = {nu = 1.4914285714285715e-05} m^2/s^2
+# nu = {nu = 1.4914285714285715e-05} m^2/s
 #
 # dimensionless below
 # h = {h = 0.04/delta} 
 # surface roughness {roughness = 1e-5/delta}
-#{ dz = 0.32/0.36 }#
+#{ dz = 0.32/delta }#
 #{ nz = 64 }
 #{ ReTau = ustar*delta/nu}
 
