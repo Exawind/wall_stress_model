@@ -102,8 +102,9 @@ print("Num. nodes = ", count, "; miny = ", miny, "; maxy = ", maxy)
 print("Num. nodes = ", count, "; minz = ", minz, "; maxz = ", maxz)
 
 ## Define the 2D ridge parameters
-h=0.04;
-b=0.1;
+delta = 0.36;
+h=0.04/delta;
+b=0.1/delta;
 Lx=maxx-minx;
 Ly=maxy-miny;
 Lz=maxz-minz;

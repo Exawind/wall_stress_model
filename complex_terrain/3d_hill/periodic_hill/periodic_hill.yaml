@@ -3,8 +3,12 @@
 # Nalu Preprocessing utility
 #
 # Generate a temperature profile with capping inversion for use with ablNeutralEdge case
-#{ dz = 0.32 }#
-#{ nz = 32 }
+# {delta = 0.36}
+# {h = 0.04/delta}
+# {roughness = 1e-5/delta}
+#{ dz = 0.32/0.36 }#
+#{ nz = 64 }
+#{ ReTau = 0.14}
 
 nalu_abl_mesh:
   output_db: mesh.exo
@@ -65,7 +69,7 @@ nalu_preprocess:
     fluid_parts: [fluid_part]
 
     temperature:
-      heights: [0, 0.24]
+      heights: [0, {dz}]
       values: [300.0]
 
       # Optional section to add random perturbations to temperature field
@@ -77,14 +81,12 @@ nalu_preprocess:
     velocity:
       heights:
       - 0
-      - 0.35
+      - {1.5*h}
+      - {dz}
       values:
-      - - .5
-        - 0.0
-        - 0.0
-      - - .5
-        - 0.0
-        - 0.0
+      - [0.0,0.0,0.0]
+      - [1.0,0.0,0.0]
+      - [1.0,0.0,0.0]
       perturbations:
         reference_height: .1   # Reference height for damping
         amplitude: [0, 0]    # Perturbation amplitudes in Ux and Uy
@@ -161,7 +163,7 @@ realms:
     
     - Enthalpy:
         name: myEnth
-        max_iterations: 1
+        max_iterations: 0
         convergence_tolerance: 1.0e-5
 
     - TurbKineticEnergy:
@@ -188,11 +190,11 @@ realms:
         # Density here was computed such that P_ref = rho_ref*(R/mw)*300K
     - name: density
       type: constant
-      value: 1.178037722969475
+      value: 1.0
 
     - name: viscosity
       type: constant
-      value: 1.2E-5
+      value: {1.0/ReTau}
 
     - name: specific_heat
       type: constant
@@ -232,20 +234,21 @@ realms:
     target_name: lower
     wall_user_data:
       velocity: [0.0,0.0,0.0]
+      no_slip: true
       abl_wall_function:
         surface_heating_table:
           - [     0.0, 0.00, 300.0, 1.0]
           - [999999.9, 0.00, 300.0, 1.0]
         reference_temperature: 300.0
-        roughness_height: 0.000004
+        roughness_height: {roughness}
         kappa: 0.4
         beta_m: 5.0
         beta_h: 5.0
         gamma_m: 16.0
         gamma_h: 16.0
         gravity_vector_component: 3
-        monin_obukhov_averaging_type: planar
-        fluctuation_model: Moeng
+        monin_obukhov_averaging_type: none
+        fluctuation_model: Schumann
         fluctuating_temperature_ref: surface
 
   solution_options:
@@ -293,7 +296,7 @@ realms:
         turbulent_ke:
           - rodi
     - source_term_parameters:
-        momentum: [0.00000001,0.0,0.0]
+        momentum: [1.0,0.0,0.0]
 
     - user_constants:
         reference_density: 1.
@@ -316,7 +319,7 @@ realms:
         turbulent_ke: tanh
 
     - peclet_function_tanh_transition:
-        velocity: 50000.0
+        velocity: 5000000.0
         enthalpy: 2.0
         turbulent_ke: 2.0
 
