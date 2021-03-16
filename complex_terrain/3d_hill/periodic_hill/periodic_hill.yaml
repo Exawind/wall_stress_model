@@ -5,14 +5,17 @@
 # Generate a temperature profile with capping inversion for use with ablNeutralEdge case
 # delta = {delta = 0.36} m 
 # ustar = {ustar = 0.212} m/s
-# nu = {nu = 1.4914285714285715e-05} m^2/s^2
+# Uinf = {Uinf = 5.8} m/s
+# nu = {nu = 1.4914285714285715e-05} m^2/s
 #
 # dimensionless below
 # h = {h = 0.04/delta} 
 # surface roughness {roughness = 1e-5/delta}
-#{ dz = 0.32/0.36 }#
 #{ nz = 64 }
+#{ dz = 0.32/delta }#
+#{ dx = dz/nz}
 #{ ReTau = ustar*delta/nu}
+#{N_BL_POINTS=10}
 
 nalu_abl_mesh:
   output_db: mesh.exo
@@ -81,16 +84,25 @@ nalu_preprocess:
 #        amplitude: 0.8 # in Kelvin
 #        cutoff_height: 600.0 # Perturbations below capping inversion
 #        skip_periodic_parts: [east, west, north, south]
-
+#
+# initialize with log law
     velocity:
       heights:
-      - 0
-      - {1.5*h}
-      - {dz}
-      values:
-      - [0.0,0.0,0.0]
-      - [1.0,0.0,0.0]
-      - [1.0,0.0,0.0]
+      {NOECHO}{_z=0}
+      {NOECHO}{dh=dz/(N_BL_POINTS-1)}
+      {Loop(N_BL_POINTS)}
+{ECHO}      - {_z}
+      {NOECHO} {_z+=dh}
+      {EndLoop}
+{ECHO}      values:
+      {NOECHO}{_z=0}
+      {NOECHO}{_u=0}
+      {Loop(N_BL_POINTS)}
+{ECHO}      - [{_u},0,0]
+      {NOECHO}{_z+=dh}
+      {NOECHO} {_u=(1.0/0.4*ln(_z*ustar/nu)+5.0)}
+      {EndLoop}
+{ECHO(ON)}
       perturbations:
         reference_height: .1   # Reference height for damping
         amplitude: [0, 0]    # Perturbation amplitudes in Ux and Uy
@@ -252,7 +264,7 @@ realms:
         gamma_h: 16.0
         gravity_vector_component: 3
         monin_obukhov_averaging_type: none
-        fluctuation_model: Schumann
+        fluctuation_model: none
         fluctuating_temperature_ref: surface
 
   solution_options:
@@ -297,15 +309,13 @@ realms:
     - source_terms:
         momentum: 
           - body_force
-        turbulent_ke:
-          - rodi
     - source_term_parameters:
         momentum: [1.0,0.0,0.0]
 
     - user_constants:
         reference_density: 1.
         reference_temperature: 1.0
-        gravity: [0.0, 0.0, -1.0]
+        gravity: [0.0, 0.0, 0.0]
         thermal_expansion_coefficient: 3.33333333e-3
         east_vector: [1.0, 0.0, 0.0]
         north_vector: [0.0, 1.0, 0.0]
@@ -364,7 +374,7 @@ Time_Integrators:
     name: ti_1
     start_time: 0.0
     termination_step_count: 20000
-    time_step: 0.005
+    time_step: {0.5*dx/(Uinf/ustar)}
     time_stepping_type: fixed
     time_step_count: 0
     second_order_accuracy: yes

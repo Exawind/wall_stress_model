@@ -250,7 +250,7 @@ realms:
     target_name: lower
     wall_user_data:
       velocity: [0.0,0.0,0.0]
-      no_slip: true
+      no_slip: false
       abl_wall_function:
         surface_heating_table:
           - [     0.0, 0.00, 1.0, 1.0]
