@@ -3,9 +3,6 @@
 # Nalu Preprocessing utility
 #
 # Generate a temperature profile with capping inversion for use with ablNeutralEdge case
-<<<<<<< HEAD
-#
-=======
 # delta = {delta = 0.36} m 
 # ustar = {ustar = 0.212} m/s
 # Uinf = {Uinf = 5.8} m/s
@@ -19,7 +16,6 @@
 #{ dx = dz/nz}
 #{ ReTau = ustar*delta/nu}
 #{N_BL_POINTS=10}
->>>>>>> 1bbf99937ca0546491b1938ae9d8c9ada33dbcf3
 
 nalu_abl_mesh:
   output_db: mesh.exo
@@ -254,7 +250,7 @@ realms:
     target_name: lower
     wall_user_data:
       velocity: [0.0,0.0,0.0]
-      no_slip: true
+      no_slip: false
       abl_wall_function:
         surface_heating_table:
           - [     0.0, 0.00, 1.0, 1.0]

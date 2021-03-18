@@ -3,8 +3,19 @@
 # Nalu Preprocessing utility
 #
 # Generate a temperature profile with capping inversion for use with ablNeutralEdge case
-#{ dz = 0.32 }#
-#{ nz = 32 }
+# delta = {delta = 0.36} m 
+# ustar = {ustar = 0.212} m/s
+# Uinf = {Uinf = 5.8} m/s
+# nu = {nu = 1.4914285714285715e-05} m^2/s
+#
+# dimensionless below
+# h = {h = 0.04/delta} 
+# surface roughness {roughness = 1e-5/delta}
+#{ nz = 64 }
+#{ dz = 0.32/delta }#
+#{ dx = dz/nz}
+#{ ReTau = ustar*delta/nu}
+#{N_BL_POINTS=10}
 
 nalu_abl_mesh:
   output_db: mesh.exo
@@ -65,26 +76,33 @@ nalu_preprocess:
     fluid_parts: [fluid_part]
 
     temperature:
-      heights: [0, 0.24]
-      values: [300.0]
+      heights: [0, {dz}]
+      values: [1.0]
 
       # Optional section to add random perturbations to temperature field
 #      perturbations:
 #        amplitude: 0.8 # in Kelvin
 #        cutoff_height: 600.0 # Perturbations below capping inversion
 #        skip_periodic_parts: [east, west, north, south]
-
+#
+# initialize with log law
     velocity:
       heights:
-      - 0
-      - 0.35
-      values:
-      - - .5
-        - 0.0
-        - 0.0
-      - - .5
-        - 0.0
-        - 0.0
+      {NOECHO}{_z=0}
+      {NOECHO}{dh=dz/(N_BL_POINTS-1)}
+      {Loop(N_BL_POINTS)}
+{ECHO}      - {_z}
+      {NOECHO} {_z+=dh}
+      {EndLoop}
+{ECHO}      values:
+      {NOECHO}{_z=0}
+      {NOECHO}{_u=0}
+      {Loop(N_BL_POINTS)}
+{ECHO}      - [{_u},0,0]
+      {NOECHO}{_z+=dh}
+      {NOECHO} {_u=(1.0/0.4*ln(_z*ustar/nu)+5.0)}
+      {EndLoop}
+{ECHO(ON)}
       perturbations:
         reference_height: .1   # Reference height for damping
         amplitude: [0, 0]    # Perturbation amplitudes in Ux and Uy
@@ -161,7 +179,7 @@ realms:
     
     - Enthalpy:
         name: myEnth
-        max_iterations: 1
+        max_iterations: 0
         convergence_tolerance: 1.0e-5
 
     - TurbKineticEnergy:
@@ -188,11 +206,11 @@ realms:
         # Density here was computed such that P_ref = rho_ref*(R/mw)*300K
     - name: density
       type: constant
-      value: 1.178037722969475
+      value: 1.0
 
     - name: viscosity
       type: constant
-      value: 1.2E-5
+      value: {1.0/ReTau}
 
     - name: specific_heat
       type: constant
@@ -232,20 +250,21 @@ realms:
     target_name: lower
     wall_user_data:
       velocity: [0.0,0.0,0.0]
+      no_slip: true
       abl_wall_function:
         surface_heating_table:
-          - [     0.0, 0.00, 300.0, 1.0]
-          - [999999.9, 0.00, 300.0, 1.0]
-        reference_temperature: 300.0
-        roughness_height: 0.000004
+          - [     0.0, 0.00, 1.0, 1.0]
+          - [999999.9, 0.00, 1.0, 1.0]
+        reference_temperature: 1.0
+        roughness_height: {roughness}
         kappa: 0.4
         beta_m: 5.0
         beta_h: 5.0
         gamma_m: 16.0
         gamma_h: 16.0
         gravity_vector_component: 3
-        monin_obukhov_averaging_type: planar
-        fluctuation_model: Moeng
+        monin_obukhov_averaging_type: none
+        fluctuation_model: none
         fluctuating_temperature_ref: surface
 
   solution_options:
@@ -258,7 +277,7 @@ realms:
     fix_pressure_at_node:
       value: 0.0
       node_lookup_type: spatial_location
-      location: [-0.1, 0.13, .01]
+      location: [0.0, 0.13, .01]
       search_target_part: [fluid_part]
       search_method: stk_kdtree
 
@@ -290,15 +309,13 @@ realms:
     - source_terms:
         momentum: 
           - body_force
-        turbulent_ke:
-          - rodi
     - source_term_parameters:
-        momentum: [0.00000001,0.0,0.0]
+        momentum: [1.0,0.0,0.0]
 
     - user_constants:
         reference_density: 1.
-        reference_temperature: 300.0
-        gravity: [0.0, 0.0, -9.81]
+        reference_temperature: 1.0
+        gravity: [0.0, 0.0, 0.0]
         thermal_expansion_coefficient: 3.33333333e-3
         east_vector: [1.0, 0.0, 0.0]
         north_vector: [0.0, 1.0, 0.0]
@@ -316,7 +333,7 @@ realms:
         turbulent_ke: tanh
 
     - peclet_function_tanh_transition:
-        velocity: 50000.0
+        velocity: 5000000.0
         enthalpy: 2.0
         turbulent_ke: 2.0
 
@@ -357,7 +374,7 @@ Time_Integrators:
     name: ti_1
     start_time: 0.0
     termination_step_count: 20000
-    time_step: 0.005
+    time_step: {0.5*dx/(Uinf/ustar)}
     time_stepping_type: fixed
     time_step_count: 0
     second_order_accuracy: yes
