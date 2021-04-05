@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name=precursor                 # Job name
+#SBATCH --time=4:00:00
+#SBATCH --nodes=10                               # Number of nodes
+#SBATCH --ntasks-per-node=36                    # Number of processors per node
+#SBATCH --account=hfm                           # Allocation
+#SBATCH --mail-user psakiev@sandia.gov    # E-mail adres
+#SBATCH --mail-type BEGIN,END,FAIL              # Send e-mail when job begins, ends or fails
+
+source $HOME/.bashrc
+nalu_env intel
+#srun -n 1 -c 1 /home/gdeskos/wind-utils/build/src/preprocessing/nalu_preprocess -i preprocess.yaml
+#source /nopt/nrel/ecom/exawind/exawind/scripts/exawind-env-python.sh
+#srun -n 360 -c 1 python create_complex_terrain.py 
+
+#nalu_env intel
+
+# Launch boundary data simulation
+srun -n 360 -c 1 --cpu_bind=cores /home/psakiev/nalu-wind/build_intel/naluX -i precursor.yaml
